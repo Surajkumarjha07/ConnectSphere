@@ -5,10 +5,10 @@ import { useLogin } from '../context';
 
 export default function Navbar() {
   const [time, setTime] = useState('');
-  const { isLoggedIn, setIsLoggedIn } = useLogin();
+  const { isLoggedIn} = useLogin();
 
   function timeUpdate() {
-    setTime(new Date().toLocaleString('en-IN', {
+    setTime(new Date().toLocaleString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h12',

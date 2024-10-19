@@ -3,19 +3,39 @@ const mongoose = require("mongoose")
 const bcrypt = require("bcrypt")
 const cors = require("cors")
 const jwt = require("jsonwebtoken")
+const socketIO = require("socket.io");
+const http = require("http");
 
 app = express();
-
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
-
 const corsOptions = {
-    origin: '*', 
+    origin: true,
     methods: ['POST', 'GET', 'PUT', 'DELETE'],
+    allowedHeaders: '*',
     credentials: true
 };
 
+app.use(express.json())
 app.use(cors(corsOptions))
+app.use(express.urlencoded({ extended: true }))
+const httpServer = http.createServer(app);
+const io = socketIO(httpServer, {
+    cors: corsOptions
+});
+
+try {
+    io.on("connection", (socket) => {
+        socket.on('message', (messages) => {
+            io.emit("user-messages",messages);
+        })
+        console.log("Socket IO is connected");
+
+        socket.on('disconnect', () => {
+            console.log('Client disconnected (server)');
+        })
+    });
+} catch (error) {
+    console.log("error in connecting SocketIO");   
+}
 
 mongoose.connect("mongodb+srv://surajkumarjha771:MongoCompass@cluster0.i20qj.mongodb.net/")
     .then(
@@ -169,6 +189,6 @@ app.delete('/deleteUser', async (req, res) => {
     }
 })
 
-app.listen(8000, () => {
+httpServer.listen(8000, () => {
     console.log('server is running');
 })
