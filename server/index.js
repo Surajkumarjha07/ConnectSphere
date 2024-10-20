@@ -22,21 +22,6 @@ const io = socketIO(httpServer, {
     cors: corsOptions
 });
 
-try {
-    io.on("connection", (socket) => {
-        socket.on('message', (messages) => {
-            io.emit("user-messages",messages);
-        })
-        console.log("Socket IO is connected");
-
-        socket.on('disconnect', () => {
-            console.log('Client disconnected (server)');
-        })
-    });
-} catch (error) {
-    console.log("error in connecting SocketIO");   
-}
-
 mongoose.connect("mongodb+srv://surajkumarjha771:MongoCompass@cluster0.i20qj.mongodb.net/")
     .then(
         console.log("Databse is conected")
@@ -66,6 +51,21 @@ const userSchema = new mongoose.Schema({
 
 const users = new mongoose.model('users', userSchema)
 
+//Socket Connection
+try {
+    io.on("connection", (socket) => {
+        socket.on('message', (fromUser, messages) => {
+            io.emit("user-messages", fromUser, messages);
+        })
+        socket.on('disconnect', () => {
+            console.log('Client disconnected (server)');
+        })
+    });
+    console.log("Socket IO is connected");
+} catch (error) {
+    console.log("error in connecting SocketIO");
+}
+
 app.post('/signUp', async (req, res) => {
     const { name, email, password } = req.body;
     let existingUser = await users.findOne({ email });
@@ -91,8 +91,7 @@ app.post("/login", async (req, res) => {
     let verifiedPassword = await bcrypt.compare(password, existingUser.password);
     if (email && password) {
         if (verifiedPassword) {
-            let token = Math.ceil(Math.random() * (70000 - 17000) + 17000) + "ConnectSphereSecurityKey"
-            // let token = jwt.sign()
+            const token = jwt.sign({userId: existingUser._id},'ConnectSphere',{expiresIn: '1min'})
             res.status(200).json({
                 message: "User LoggedIn",
                 token

@@ -5,7 +5,7 @@ import { useLogin } from '../context';
 
 export default function Navbar() {
   const [time, setTime] = useState('');
-  const { isLoggedIn} = useLogin();
+  const { isLoggedIn, setIsLoggedIn } = useLogin();
 
   function timeUpdate() {
     setTime(new Date().toLocaleString('en-US', {
@@ -20,6 +20,10 @@ export default function Navbar() {
 
   useEffect(() => {
     timeUpdate();
+    let token = localStorage.getItem('token');
+    if (token) {
+      setIsLoggedIn(true)
+    }
   }, [])
 
   setTimeout(() => {

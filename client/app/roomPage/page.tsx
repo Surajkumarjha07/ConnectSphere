@@ -1,12 +1,14 @@
 'use client'
 import Image from 'next/image'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import ChatIcon from '@mui/icons-material/Chat';
 import ChatBubbleRoundedIcon from '@mui/icons-material/ChatBubbleRounded';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import PeopleIcon from '@mui/icons-material/People';
-import SendIcon from '@mui/icons-material/Send';
+import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { io } from 'socket.io-client';
+import { ReturnType } from '../types'
+import ReactPlayer from 'react-player';
 
 export default function RoomPage() {
   const [time, setTime] = useState<string>('');
@@ -14,6 +16,10 @@ export default function RoomPage() {
   const [toggleChat, setToggleChat] = useState<boolean>(false);
   const [toggleSidebar, setToggleSidebar] = useState(false)
   const [toggleDiv, setToggleDiv] = useState<boolean>(false);
+  const [message, setMessage] = useState<string>('');
+  const [myStream, setMyStream] = useState<MediaStream>();
+  const [fromUser, setFromUser] = useState('dola');
+  const [receivingMsgArray, setReceivingMsgArray] = useState<ReturnType[]>([]);
 
   function timeUpdate() {
     setTime(new Date().toLocaleString('en-US', {
@@ -23,6 +29,10 @@ export default function RoomPage() {
     }))
   }
 
+  const socket = io("http://127.0.0.1:8000", {
+    withCredentials: true
+  })
+
   useEffect(() => {
     timeUpdate();
     socket.on("connect", () => {
@@ -30,11 +40,10 @@ export default function RoomPage() {
     });
 
     return () => {
-      socket.on("disconnect", () => {
-        console.log('Client disconnected (client)');
-      });
+      socket.off("connect");
+      socket.off('message')
     }
-  }, [])  
+  }, [])
 
   setTimeout(() => {
     setTime(new Date().toLocaleString('en-US', {
@@ -43,10 +52,6 @@ export default function RoomPage() {
       hourCycle: 'h12',
     }))
   }, 1000);
-
-  const socket = io("http://127.0.0.1:8000", {
-    withCredentials: true
-  })
 
   const toggleChatSection = (e: React.MouseEvent<HTMLButtonElement>) => {
     let target = e.target as HTMLButtonElement
@@ -74,22 +79,37 @@ export default function RoomPage() {
     setToggleDiv(!toggleDiv);
   }
 
-  socket.on('user-messages', (message) => {
-    console.log(message);    
+  const sendMessage = () => {
+    socket.emit("message", fromUser, message);
+    setMessage('');
+  }
+
+  socket.on('user-messages', (fromUser, message) => {
+    setFromUser(fromUser)
+    setReceivingMsgArray([...receivingMsgArray, { fromUser, message }])
   })
 
-  const sendMessage = () => {
-    socket.emit("message","User is here")
-  }
+  const handleCallUser = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    })
+    setMyStream(stream);
+  }, [myStream]);
 
   return (
     <>
       <section className='w-screen h-screen flex flex-col justify-between items-center pt-4'>
 
-        <div className={`${!toggleSidebar ? 'w-4/6' : 'w-4/6 -translate-x-48'} transition-all duration-500 h-4/5 bg-white rounded-md`}></div>
+        <div className={`${!toggleSidebar ? 'w-4/6' : 'w-4/6 -translate-x-48'} transition-all duration-500 h-4/5 bg-white rounded-md flex justify-center items-center`}>
+          {
+            myStream ? <ReactPlayer playing volume={1} width={'100%'} height={'100%'} url={myStream} className='w-full h-full' /> :
+              <div className='bg-gray-200 w-40 h-40 rounded-full text-4xl text-gray-600 flex justify-center items-center'> S </div>
+          }
+        </div>
 
         {/* Sidebar Section */}
-        <section className={`absolute top-4 right-6 bg-white w-96 h-5/6 rounded-md py-4 px-4 transition-all duration-500 overflow-hidden ${toggleSidebar ? 'translate-x-[0rem]' : 'translate-x-[40rem]'}`}>
+        <section className={`absolute top-4 right-6 bg-white w-96 h-5/6 rounded-md py-4 px-8 transition-all duration-500 overflow-hidden ${toggleSidebar ? 'translate-x-[0rem]' : 'translate-x-[40rem]'}`}>
 
           {/* People Section */}
           <div className={`${togglePeople ? 'visible' : 'hidden'}`}>
@@ -146,11 +166,20 @@ export default function RoomPage() {
               <Image src={'https://cdn-icons-png.flaticon.com/512/10728/10728089.png'} alt='' width={20} height={20} className='cursor-pointer' onClick={cancel} />
             </div>
             <div className={`h-full flex flex-col justify-between`}>
-              <div className='w-full h-full my-4 overflow-y-scroll customScroll'></div>
+              <div className='w-full h-full my-4 overflow-y-scroll customScroll'>
+                {
+                  receivingMsgArray.map(({fromUser, message}, index) => (
+                    <div key={index} className='w-full bg-transparent hover:bg-gray-100 text-gray-700 my-2'>
+                      <p className='font-semibold text-gray-700 text-sm'> {fromUser} </p>
+                      <p className='font-medium text-gray-500 text-sm w-fit'> {message} </p>
+                    </div>
+                  ))
+                }
+              </div>
               <div className='flex justify-start items-center gap-5 bg-gray-100 rounded-full'>
-                <input type="text" name='chatBox' className='bg-gray-100 text-gray-700 rounded-full py-3 px-4 border-none outline-none w-full placeholder:text-sm' placeholder='Send message' />
+                <input type="text" name='chatBox' className='bg-gray-100 text-gray-700 rounded-full py-3 px-4 border-none outline-none w-full placeholder:text-sm' placeholder='Send message' value={message} onChange={e => setMessage(e.target.value)} />
                 <button className='p-3 rounded-full hover:bg-gray-200' onClick={sendMessage}>
-                 <SendIcon className='text-gray-600 w-7 h-7'/>
+                  <SendRoundedIcon className={`${message? 'text-blue-500' : 'text-gray-400'} w-7 h-7`} />
                 </button>
               </div>
             </div>
@@ -160,7 +189,7 @@ export default function RoomPage() {
 
         <div className='flex justify-center items-center w-screen h-24 mx-auto rounded-md py-2 px-8'>
           <p className='text-lg font-medium text-gray-500'> {time} </p>
-          <button className='w-14 h-14 bg-gray-200 rounded-full flex justify-center items-center mx-auto'>
+          <button className='w-14 h-14 bg-gray-200 rounded-full flex justify-center items-center mx-auto' onClick={handleCallUser}>
             <Image src={'https://b2174441.smushcdn.com/2174441/wp-content/uploads/2022/08/phone-icon-red.png?lossy=0&strip=0&webp=1'} alt='Call' width={50} height={50} className='w-6 h-6' />
           </button>
 

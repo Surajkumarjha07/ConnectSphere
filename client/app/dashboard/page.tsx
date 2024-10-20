@@ -57,13 +57,13 @@ export default function Dashboard() {
         <div className='w-1/2 h-screen text-center flex flex-col justify-center items-center gap-10'>
           <div className='flex justify-between items-center w-96'>
             <button className='hover:bg-gray-100 p-2 rounded-full' onClick={decreaseActive}>
-              <Image src='https://icones.pro/wp-content/uploads/2021/06/symbole-fleche-gauche-gris.png' alt='' width={100} height={100} className='w-7 h-7' />
+              <Image src='https://cdn-icons-png.flaticon.com/128/271/271220.png' alt='' width={100} height={100} className='w-5 h-5' />
             </button>
 
             <Image src={active === 0 ? ImageArr[0] : ImageArr[1]} alt='Image' width={100} height={100} className='mx-auto w-64 h-64' />
 
             <button className='hover:bg-gray-100 p-2 rounded-full' onClick={increaseActive}>
-              <Image src='https://icones.pro/wp-content/uploads/2021/06/symbole-fleche-droite-grise.png' alt='' width={100} height={100} className='w-7 h-7' />
+              <Image src='https://cdn-icons-png.flaticon.com/128/271/271228.png' alt='' width={100} height={100} className='w-5 h-5' />
             </button>
           </div>
 

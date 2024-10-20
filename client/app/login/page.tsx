@@ -8,7 +8,6 @@ import { useLogin } from '../context';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loggedIn, setLoggedIn] = useState<boolean>(false)
   const { isLoggedIn, setIsLoggedIn } = useLogin();
   const router = useRouter();
 
@@ -22,12 +21,14 @@ export default function Login() {
         },
         body: JSON.stringify({ email, password })
       })
-
-      console.log(response);
+      
       if (response.ok) {
+        response.json().then(
+          response =>       
+            localStorage.setItem("token", response.token)
+        )
         setEmail("")
         setPassword("")
-        setLoggedIn(true)
         setIsLoggedIn(true);
       }
     } catch (error) {
@@ -37,10 +38,10 @@ export default function Login() {
   }
 
   useEffect(() => {
-    if (loggedIn) {
+    if (isLoggedIn) {
       router.push('./dashboard')
     }
-  }, [loggedIn])
+  }, [isLoggedIn])
 
 
   return (
