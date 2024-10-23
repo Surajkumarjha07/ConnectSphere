@@ -1,4 +1,4 @@
 export type ReturnType = {
     fromUser: string,
-    message: string
+    messages: string
 }

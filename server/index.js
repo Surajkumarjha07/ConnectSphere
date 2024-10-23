@@ -54,14 +54,46 @@ const users = new mongoose.model('users', userSchema)
 //Socket Connection
 try {
     io.on("connection", (socket) => {
+        //Chat 
         socket.on('message', (fromUser, messages) => {
             io.emit("user-messages", fromUser, messages);
+            console.log(messages);
         })
         socket.on('disconnect', () => {
             console.log('Client disconnected (server)');
         })
+
+        const emailToSocket = new Map();
+        const socketToEmail = new Map();
+        //VC 
+        socket.on('room:join', (email, roomId) => {
+            console.log(email, roomId);
+            emailToSocket.set(email, socket.id)
+            socketToEmail.set(socket.id, email)
+            socket.join(roomId);
+            io.to(socket.id).emit("room:join", { email, roomId });
+        })
+
+        socket.on("newuser:join", (email, roomId) => {
+            console.log("Another user joined", email, roomId);
+            emailToSocket.set(email, socket.id)
+            socketToEmail.set(socket.id, email)
+            socket.join(roomId);
+            io.to(roomId).emit("newuser:join", { email, roomId })
+        })
+
+        socket.on("offer:sent", (to, offer) => {
+            console.log(to,offer);            
+            io.to(to).emit("offer:received", {from: socket.id, offer});
+            console.log("offer received sent");            
+        })
+
+        socket.on("offer:accepted", (to, ans) => {
+            console.log("offer accepted server", to, ans);            
+        })
+        
     });
-    console.log("Socket IO is connected");
+    console.log(`Socket IO is connected`);
 } catch (error) {
     console.log("error in connecting SocketIO");
 }
@@ -91,7 +123,7 @@ app.post("/login", async (req, res) => {
     let verifiedPassword = await bcrypt.compare(password, existingUser.password);
     if (email && password) {
         if (verifiedPassword) {
-            const token = jwt.sign({userId: existingUser._id},'ConnectSphere',{expiresIn: '1min'})
+            const token = jwt.sign({ userId: existingUser._id }, 'ConnectSphere', { expiresIn: '1min' })
             res.status(200).json({
                 message: "User LoggedIn",
                 token

@@ -1,25 +1,31 @@
 'use client'
 import Image from 'next/image'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ChatIcon from '@mui/icons-material/Chat';
 import ChatBubbleRoundedIcon from '@mui/icons-material/ChatBubbleRounded';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import PeopleIcon from '@mui/icons-material/People';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
-import { io } from 'socket.io-client';
-import { ReturnType } from '../types'
+import { ReturnType } from '../../types'
 import ReactPlayer from 'react-player';
+import { useParams } from 'next/navigation';
+import { useSocket } from '../../socketContext'
+import peerService from '../../Services/SocketServices'
 
 export default function RoomPage() {
+  const params = useParams();
   const [time, setTime] = useState<string>('');
   const [togglePeople, setTogglePeople] = useState<boolean>(false);
   const [toggleChat, setToggleChat] = useState<boolean>(false);
   const [toggleSidebar, setToggleSidebar] = useState(false)
   const [toggleDiv, setToggleDiv] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
-  const [myStream, setMyStream] = useState<MediaStream>();
+  const [myStream, setMyStream] = useState<MediaStream | null>(null);
   const [fromUser, setFromUser] = useState('dola');
+  const [roomId, setRoomId] = useState<string | string[] | undefined>('');
   const [receivingMsgArray, setReceivingMsgArray] = useState<ReturnType[]>([]);
+  const { socket } = useSocket();
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
 
   function timeUpdate() {
     setTime(new Date().toLocaleString('en-US', {
@@ -29,33 +35,51 @@ export default function RoomPage() {
     }))
   }
 
-  const socket = io("http://127.0.0.1:8000", {
-    withCredentials: true
-  })
+  const sendMessage = () => {
+    socket.emit("message", fromUser, message);
+    setMessage('');
+  }
 
+  //Socket Functions
+  const handleCallUser = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    })
+    setMyStream(stream);
+  }, [myStream]);
+
+  //Socket useEffect
   useEffect(() => {
-    timeUpdate();
-    socket.on("connect", () => {
-      console.log(socket.id);
-    });
+    //Initialize variables
+    const { roomId } = params;
+    setRoomId(roomId);
+
+    //On events
+    socket.on('user-messages', (fromUser: string, messages: string) => {
+      setFromUser(fromUser)
+      setReceivingMsgArray([...receivingMsgArray, { fromUser, messages }])
+    })
+
+    socket.on("newuser:join", ({ email, roomId }: any) => {
+      console.log("Another user joined", email, roomId);
+    })
 
     return () => {
-      socket.off("connect");
-      socket.off('message')
+      socket.off("user-messages");
+      socket.off("newuser:join");
     }
+  }, [socket])
+
+
+  useEffect(() => {
+    handleCallUser();
+    setInterval(() => {
+      timeUpdate();
+    }, 1000);
   }, [])
 
-  setTimeout(() => {
-    setTime(new Date().toLocaleString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h12',
-    }))
-  }, 1000);
-
   const toggleChatSection = (e: React.MouseEvent<HTMLButtonElement>) => {
-    let target = e.target as HTMLButtonElement
-    console.log(target.value);
     setToggleSidebar(true);
     setToggleChat(true);
     setTogglePeople(false);
@@ -79,31 +103,13 @@ export default function RoomPage() {
     setToggleDiv(!toggleDiv);
   }
 
-  const sendMessage = () => {
-    socket.emit("message", fromUser, message);
-    setMessage('');
-  }
-
-  socket.on('user-messages', (fromUser, message) => {
-    setFromUser(fromUser)
-    setReceivingMsgArray([...receivingMsgArray, { fromUser, message }])
-  })
-
-  const handleCallUser = useCallback(async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    })
-    setMyStream(stream);
-  }, [myStream]);
-
   return (
     <>
       <section className='w-screen h-screen flex flex-col justify-between items-center pt-4'>
 
         <div className={`${!toggleSidebar ? 'w-4/6' : 'w-4/6 -translate-x-48'} transition-all duration-500 h-4/5 bg-white rounded-md flex justify-center items-center`}>
           {
-            myStream ? <ReactPlayer playing volume={1} width={'100%'} height={'100%'} url={myStream} className='w-full h-full' /> :
+            myStream ? <ReactPlayer playing muted volume={1} width={'100%'} height={'100%'} url={myStream} className='w-full h-full' /> :
               <div className='bg-gray-200 w-40 h-40 rounded-full text-4xl text-gray-600 flex justify-center items-center'> S </div>
           }
         </div>
@@ -168,10 +174,10 @@ export default function RoomPage() {
             <div className={`h-full flex flex-col justify-between`}>
               <div className='w-full h-full my-4 overflow-y-scroll customScroll'>
                 {
-                  receivingMsgArray.map(({fromUser, message}, index) => (
+                  receivingMsgArray.map(({ fromUser, messages }, index) => (
                     <div key={index} className='w-full bg-transparent hover:bg-gray-100 text-gray-700 my-2'>
                       <p className='font-semibold text-gray-700 text-sm'> {fromUser} </p>
-                      <p className='font-medium text-gray-500 text-sm w-fit'> {message} </p>
+                      <p className='font-medium text-gray-500 text-sm w-fit'> {messages} </p>
                     </div>
                   ))
                 }
@@ -179,7 +185,7 @@ export default function RoomPage() {
               <div className='flex justify-start items-center gap-5 bg-gray-100 rounded-full'>
                 <input type="text" name='chatBox' className='bg-gray-100 text-gray-700 rounded-full py-3 px-4 border-none outline-none w-full placeholder:text-sm' placeholder='Send message' value={message} onChange={e => setMessage(e.target.value)} />
                 <button className='p-3 rounded-full hover:bg-gray-200' onClick={sendMessage}>
-                  <SendRoundedIcon className={`${message? 'text-blue-500' : 'text-gray-400'} w-7 h-7`} />
+                  <SendRoundedIcon className={`${message ? 'text-blue-500' : 'text-gray-400'} w-7 h-7`} />
                 </button>
               </div>
             </div>

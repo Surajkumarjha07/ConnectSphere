@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import {LoginProvider} from './context'
+import { LoginProvider } from './context'
+import { SocketProvider } from './socketContext'
 import Background from "./components/background";
 
 const geistSans = localFont({
@@ -30,10 +31,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white overflow-hidden`}
       >
-        <Background/>
-        <LoginProvider>
-        {children}
-        </LoginProvider>
+        <Background />
+        <SocketProvider>
+          <LoginProvider>
+            {children}
+          </LoginProvider>
+        </SocketProvider>
       </body>
     </html>
   );

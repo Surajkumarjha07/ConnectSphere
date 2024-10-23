@@ -5,7 +5,7 @@ import { useLogin } from '../context';
 
 export default function Navbar() {
   const [time, setTime] = useState('');
-  const { isLoggedIn, setIsLoggedIn } = useLogin();
+  const { isLoggedIn, setIsLoggedIn, localUser } = useLogin();
 
   function timeUpdate() {
     setTime(new Date().toLocaleString('en-US', {
@@ -20,7 +20,7 @@ export default function Navbar() {
 
   useEffect(() => {
     timeUpdate();
-    let token = localStorage.getItem('token');
+    let token = sessionStorage.getItem('token');
     if (token) {
       setIsLoggedIn(true)
     }
@@ -54,7 +54,7 @@ export default function Navbar() {
                   <button className='text-xl font-medium text-gray-500'> Sign In </button>
                 </Link> :
                 <div className='flex justify-center items-center bg-gray-200 rounded-full w-14 h-14 text-gray-900 font-bold text-2xl'>
-                  S
+                  {localUser?.charAt(0)}
                 </div>
             }
           </li>

@@ -2,13 +2,12 @@
 import React, { FormEvent, useEffect, useState } from 'react'
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Background from '../components/background';
 import { useLogin } from '../context';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { isLoggedIn, setIsLoggedIn } = useLogin();
+  const { isLoggedIn, setIsLoggedIn, localUser, setLocalUser } = useLogin();
   const router = useRouter();
 
   const LogIn = async (e: FormEvent<HTMLFormElement>) => {
@@ -21,12 +20,14 @@ export default function Login() {
         },
         body: JSON.stringify({ email, password })
       })
-      
+
       if (response.ok) {
+        sessionStorage.setItem("localUser", email)
         response.json().then(
-          response =>       
-            localStorage.setItem("token", response.token)
+          response =>
+            sessionStorage.setItem("token", response.token)
         )
+        setLocalUser(email)
         setEmail("")
         setPassword("")
         setIsLoggedIn(true);
@@ -42,7 +43,6 @@ export default function Login() {
       router.push('./dashboard')
     }
   }, [isLoggedIn])
-
 
   return (
     <>

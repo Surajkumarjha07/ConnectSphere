@@ -2,22 +2,20 @@
 import React, { act, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Navbar from '../components/navbar';
-import Link from 'next/link';
+import { ImageArr, parArr, headingArr } from '../SampleArrays'
+import { useSocket } from '../socketContext'
+import { useRouter } from 'next/navigation';
+import { useLogin } from '../context'
+import peerService from '../Services/SocketServices'
 
 export default function Dashboard() {
-  const [meetingCode, setMeetingCode] = useState<string>('');
   const [active, setActive] = useState<number>(0);
+  const [roomMeetingCode, setRoomMeetingCode] = useState<string>('');
+  const [callOffer, setCallOffer] = useState<any>();
   const ref = useRef<HTMLDivElement>(null);
-
-  const ImageArr = ['https://www.gstatic.com/meet/user_edu_get_a_link_light_90698cd7b4ca04d3005c962a3756c42d.svg',
-    'https://www.gstatic.com/meet/user_edu_safety_light_e04a2bbb449524ef7e49ea36d5f25b65.svg'
-  ]
-
-  const headingArr = ['Get a link you can share', 'Your meeting is safe']
-  const parArr = [
-    <>Click <b> New meeting </b> to get a link you can send to people you want to meet with</>,
-    `No one can join a meeting unless invited or admitted by the host`
-  ]
+  const router = useRouter();
+  const { localUser, setLocalUser } = useLogin()
+  const { socket } = useSocket();
 
   const increaseActive = () => {
     active === 1 ? setActive(0) : setActive(prev => prev + 1);
@@ -25,6 +23,57 @@ export default function Dashboard() {
 
   const decreaseActive = () => {
     active === 0 ? setActive(1) : setActive(prev => prev - 1);
+  }
+
+  const generateRandomMeetingCode = () => {
+    const alphabets = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    let result = '';
+    let min = 0;
+    let max = 52;
+
+    for (let i = 0; i < 9; i++) {
+      let char = Math.floor(Math.random() * (max - min)) + min;
+      result += alphabets[char];
+    }
+    setRoomMeetingCode(result)
+    return result;
+  }
+
+  socket.on("room:join", ({ email, roomId }: any) => {
+    console.log("First User ", email, roomId);
+    setLocalUser(email);
+  })
+
+  const newMeeting = async () => {
+    const meetingCode = generateRandomMeetingCode();
+    socket.emit("room:join", localUser, meetingCode)
+    router.push(`/roomPage/${meetingCode}`)
+    try {
+      const offer = await peerService.getOffer();
+      setCallOffer(offer);
+      console.log(offer);
+      socket.emit("offer:sent", meetingCode, offer)
+    } catch (error) {
+      console.error("Error getting offer:", error);
+    }
+  }
+
+  const joinMeeting = async () => {
+    socket.emit("newuser:join", localUser, roomMeetingCode)
+    router.push(`/roomPage/${roomMeetingCode}`)
+    socket.on("offer:received", async ({ from, offer }: any) => {
+      try {
+        const ans = await peerService.getAnswer(offer);
+        setCallOffer(offer);
+        console.log(ans);
+        console.log("offer received", from, offer);
+        socket.emit("offer:accepted", roomMeetingCode, ans);
+      } catch (error) {
+        console.log("Error in sending answer");
+      }
+    })
+    const ans = await peerService.getAnswer(callOffer);
+    console.log(ans);
   }
 
   return (
@@ -37,20 +86,20 @@ export default function Dashboard() {
             <p className='text-gray-400 font-medium text-xl w-96 my-2'> Connect, collaborate and celebrate from anywhere in Connect Sphere </p>
           </div>
           <div className='flex justify-start gap-7 py-2'>
-            <Link href={'/roomPage'}>
-            <button className='bg-blue-500 border-none text-white font-semibold px-5 py-3 rounded-md'>
+            {/* <Link href={'/roomPage'}> */}
+            <button className='bg-blue-500 border-none text-white font-semibold px-5 py-3 rounded-md' onClick={newMeeting}>
               New Meeting
             </button>
-            </Link>
+            {/* </Link> */}
 
             <div className='relative border-2 border-gray-400 rounded-md focus-within:border-blue-400 overflow-hidden'>
               <div className='w-full h-full flex justify-start items-center px-3 absolute pointer-events-none'>
                 <Image src="https://cdn-icons-png.freepik.com/256/16633/16633181.png?ga=GA1.1.340517500.1727584059&semt=ais_hybrid" alt="keyboard" width={100} height={100} className='w-6 h-6' />
               </div>
-              <input type="text" name="meetingCode" className='h-full outline-none text-gray-600 pl-12 placeholder:text-gray-600' placeholder='Enter a code or link' onChange={e => setMeetingCode(e.target.value)} />
+              <input type="text" name="meetingCode" className='h-full outline-none text-gray-600 pl-12 placeholder:text-gray-600' placeholder='Enter a code or link' onChange={e => setRoomMeetingCode(e.target.value)} />
             </div>
 
-            <button className={!meetingCode ? 'border-none text-gray-400 font-semibold cursor-default' : 'border-none text-blue-400 font-semibold cursor-pointer'}> Join </button>
+            <button className={!roomMeetingCode ? 'border-none text-gray-400 font-semibold cursor-default' : 'border-none text-blue-400 font-semibold cursor-pointer'} onClick={joinMeeting}> Join </button>
           </div>
         </div>
 
